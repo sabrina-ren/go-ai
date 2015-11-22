@@ -1,6 +1,6 @@
 Declare Function makePlayerMove _
 Lib "C:\Users\sabrinaren\Documents\Visual Studio 2015\Projects\Go\Debug\Go.dll" _
-(ByRef x As Long, ByRef y As Long, ByRef numPiecesEaten As Long, ByRef firstElement As Long) As Long
+(ByRef x As Long, ByRef y As Long, ByRef playerScore As Long, ByRef cpuScore As Long, ByRef firstElement As Long) As Long
 
 ' Example of how to call DLL
 ' We don't need long, but a long in VBA seems to
@@ -13,7 +13,6 @@ Sub test()
     Dim board(0 To 8, 0 To 8) As Long
     Dim i As Integer, j As Integer, size As Long
 
-    ' Creates empty board
     size = 9
     For i = 0 To size - 1
         For j = 0 To size - 1
@@ -24,23 +23,20 @@ Sub test()
     Dim x As Long, y As Long
     x = 4
     y = 5
-    
-    ' Testing urrounding (4,5) with opponent pieces
-    ' (This should return invalid move right now)
     board(3, 5) = 2
     board(4, 4) = 2
     board(5, 5) = 2
-    board(4, 6) = 1
+    board(4, 6) = 2
 
     ' Passes references to these variables.
     ' numPiecesEaten will be changed to the number of opponent pieces we ate
-    ' (as a positive number), or how many pieces we lost (negative number).
-    ' It's hard-coded to 6 in the DLL right now
+    ' (as a positive number), or how many pieces we lost (negative number)
     ' The board array values will be updated to reflect the new board state, so render the whole board again
-    Dim isValid As Integer, numPiecesEaten As Long
-    numPiecesEaten = 0
+    Dim isValid As Integer, playerScore As Long, cpuScore As Long
+    playerScore = 0
+    cpuScore = 0
 
-    isValid = makePlayerMove(x, y, numPiecesEaten, board(0, 0))
+    isValid = makePlayerMove(x, y, playerScore, cpuScore, board(0, 0))
     If isValid = -1 Then
         MsgBox "Invalid move at " & x & ", " & y
     Else

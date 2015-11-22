@@ -2,15 +2,17 @@
 
 // Board constants
 const int SIZE = 9;	// Size of board
+const int E = 0;	//Empty board space
 const int P = 1;	// Player piece
 const int C = 2;	// Computer piece
-const int E = 0;	//emprt board space
 
 // Move constants
 const int INVALID = -1;	// Move is invalid
 const int VALID = 0;	// Placed move, nothing happens
 
-//! How do classes werk with DLLs and VBA? AH!
+// MCTS constants
+const int initialDepth = 10;
+
 
 /*
 	Helper methods and classes
@@ -22,6 +24,16 @@ public:
 	Point(int a, int b) {
 		x = a;
 		y = b;
+	}
+};
+
+class Component {
+public:
+	int size;
+	int liberties;
+	Component(int curSize, int curLiberties) {
+		size = curSize;
+		liberties = curLiberties;
 	}
 };
 
@@ -54,172 +66,215 @@ void writeAt(int row, int col, int *board, int value) {
 /* 
 	Returns true if valid, false if invalid
 */
-bool isCapture(int(&board)[SIZE][SIZE], bool(&checkBoard)[SIZE][SIZE], Point move, int player) {
+bool isCapture(int(&board)[SIZE][SIZE], bool(&visited)[SIZE][SIZE], Point move, int player) {
 	std::queue <Point> checkArea;
-	Point* test;
+	//Point* test;
 
-	checkBoard[move.x][move.y] = true;
+	visited[move.x][move.y] = true;
 	checkArea.push(move);
 
 	while (!checkArea.empty()) {
-		Point next = checkArea.front();
+		Point p = checkArea.front();
 		checkArea.pop();
 
-		//check pos above
-		if (next.x != 0) {
-			test = new Point(next.x - 1, next.y);
-			//an empty space means the pieces haven't been captured
-			if (board[test->x][test->y] == E) {
-				delete test;
-				return false;
-			}
+		// Check four neighbours around the point to check
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				if (!(dx == 0) != !(dy == 0)) {
+					if (p.x + dx < SIZE && p.x + dx >= 0 && p.y + dy < SIZE && p.y + dy >= 0) {
+						Point neighbour = Point(p.x + dx, p.y + dy);
 
-			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
-				checkBoard[test->x][test->y] = true;
-				checkArea.push(*test);
+						// An empty space means that pieces have not been captured
+						if (board[neighbour.x][neighbour.y] == E) {
+							return false;
+						}
+						if (visited[neighbour.x][neighbour.y] == false && board[p.x][p.y] == player) {
+							visited[neighbour.x][neighbour.y] = true;
+							checkArea.push(p);
+						}
+					}
+				}
 			}
-			delete test;
-		}
-		//check pos below
-		if (next.x != 8) {
-			test = new Point(next.x + 1, next.y);
-			//an empty space means the pieces haven't been captured
-			if (board[test->x][test->y] == E) {
-				delete test;
-				return false;
-			}
-
-			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
-				checkBoard[test->x][test->y] = true;
-				checkArea.push(*test);
-			}
-			delete test;
-		}
-		//check pos left
-		if (next.y != 0) {
-			test = new Point(next.x, next.y - 1);
-			//an empty space means the pieces haven't been captured
-			if (board[test->x][test->y] == E) {
-				delete test;
-				return false;
-			}
-
-			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
-				checkBoard[test->x][test->y] = true;
-				checkArea.push(*test);
-			}
-			delete test;
-		}
-		//check pos right
-		if (next.y != 8) {
-			test = new Point(next.x, next.y + 1);
-			//an empty space means the pieces haven't been captured
-			if (board[test->x][test->y] == E) {
-				delete test;
-				return false;
-			}
-
-			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
-				checkBoard[test->x][test->y] = true;
-				checkArea.push(*test);
-			}
-			delete test;
 		}
 	}
 
 	return true;
 }
 
-//Perform a move on the GO Board, checking for validity and capture
-int moveFunction(int(&board)[SIZE][SIZE], Point move, int player) {
-	//make sure move location isn't currently occupied
-	bool checkBoard[SIZE][SIZE] = { false };
+// Perform a move on the Go Board, checking for validity and capture
+int makeMove(int(&board)[SIZE][SIZE], Point move, int player) {
+	// Make sure move location isn't currently occupied
 	if (board[move.x][move.y] != E) {
 		return INVALID;
 	}
 
-	//make sure that move is not a suicide
+	// Make sure that move is not a suicide
+	bool visited[SIZE][SIZE] = { false };
 	board[move.x][move.y] = player;
-	if (isCapture(board, checkBoard, move, player)) {
+	if (isCapture(board, visited, move, player)) {
 		board[move.x][move.y] = E;
 		return INVALID;
 	}
-	//make the move and update capture pieces if necessary
+
+	// Make the move and update capture pieces if necessary
 	else {
 		int opponent;
-		if (player = P) { opponent = C; }
+		if (player == P) { opponent = C; }
 		else { opponent = P; }
 
-		reinitializeCheckBoard(checkBoard);
+		reinitializeCheckBoard(visited);
 
-		//check for an adjacent opponent piece and see if it was part of a capture
+		// Check for an adjacent opponent piece and see if it was part of a capture
 		bool result = false;
-		//check pos above
-		if (move.x != 0) {
-			if (board[move.x - 1][move.y] == opponent) {
-				result = isCapture(board, checkBoard, Point(move.x - 1, move.y), opponent);
-				if (result) {
-					removePieces(board, checkBoard);
-					reinitializeCheckBoard(checkBoard);
-					result = false;
-				}
-			}
-		}
-		//check pos below
-		if (move.x != 8) {
-			if (board[move.x + 1][move.y] == opponent) {
-				result = isCapture(board, checkBoard, Point(move.x + 1, move.y), opponent);
-				if (result) {
-					removePieces(board, checkBoard);
-					reinitializeCheckBoard(checkBoard);
-					result = false;
-				}
-			}
-		}
-		//check pos left
-		if (move.y != 0) {
-			if (board[move.x][move.y - 1] == opponent) {
-				result = isCapture(board, checkBoard, Point(move.x, move.y - 1), opponent);
-				if (result) {
-					removePieces(board, checkBoard);
-					reinitializeCheckBoard(checkBoard);
-					result = false;
-				}
-			}
-		}
-		//check pos right
-		if (move.y != 8) {
-			if (board[move.x][move.y + 1] == opponent) {
-				result = isCapture(board, checkBoard, Point(move.x, move.y + 1), opponent);
-				if (result) {
-					removePieces(board, checkBoard);
-				}
-			}
-		}
 
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				if (!(dx == 0) != !(dy == 0)) {
+					if (move.x + dx < SIZE && move.x + dx >= 0 && move.y + dy < SIZE && move.y + dy >= 0) {
+						if (board[move.x + dx][move.y + dy] == opponent) {
+							result = isCapture(board, visited, Point(move.x + dx, move.y + dy), opponent);
+							if (result) {
+								removePieces(board, visited);
+								reinitializeCheckBoard(visited);
+								result = false;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	return VALID;
 }
 
 
-int __stdcall makePlayerMove(int& x, int& y, int& playerScore, int& cpuScore, int *board) {
-	//convert vba board into a C++ one
-	int newBoard[SIZE][SIZE] = { 0 };
+int __stdcall makePlayerMove(int& x, int& y, int& playerScore, int& cpuScore, int *vbaBoard) {
+	// Convert VBA 2D array to manageable one
+	int board[SIZE][SIZE] = { 0 };
 	for (int i = 0; i < SIZE; i++) {
 		for (int j = 0; j < SIZE; j++) {
-			newBoard[i][j] = valueAt(i, j, board);
+			board[i][j] = valueAt(i, j, vbaBoard);
 		}
 	}
 
-	int result = moveFunction(newBoard, Point(x, y), P);
-	//return without changing board if move is invalid
-	if (result == INVALID) { return INVALID; }
+	int validity = makeMove(board, Point(x, y), P);
+	// Return without changing board if move is invalid
+	if (validity == INVALID) {
+		return INVALID;
+	}
 
-	//update board if necessary and return
+	// Update board if necessary and return
 	for (int i = 0; i < SIZE; i++) {
 		for (int j = 0; j < SIZE; j++) {
-			writeAt(i, j, board, newBoard[i][j]);
+			writeAt(i, j, vbaBoard, board[i][j]);
 		}
 	}
-	return result;
+
+	return VALID;
+}
+
+void score(int& playerScore, int& computerScore, int(&board)[SIZE][SIZE]) {
+	bool visited[SIZE][SIZE] = { false };
+
+	for (int i = 0; i < SIZE; i++) {
+		for (int j = 0; j < SIZE; j++) {
+			if (visited[i][j] == false) {
+				visited[i][j] = true;
+				if (board[i][j] == P) {
+					playerScore++;
+				}
+				else if (board[i][j] == C) {
+					computerScore++;
+				}
+				else {
+					// If empty point, look around to see what it's surrounded by
+					std::queue <Point> checkArea;
+					checkArea.push(Point(i, j));
+
+					bool isNeutralArea = false;
+					int surroundingNeighbour = 0;
+					int emptyArea = 0;
+
+					while (!checkArea.empty()) {
+						Point p = checkArea.front();
+						checkArea.pop();
+						emptyArea++;
+
+						// Check its four neighbours
+						for (int dx = -1; dx <= 1; dx++) {
+							for (int dy = -1; dy <= 1; dy++) {
+								if (!(dx == 0) != !(dy == 0)) {
+									if (p.x + dx < SIZE && p.x + dx >= 0 && p.y + dy < SIZE && p.y + dy >= 0) {
+										Point neighbour = Point(p.x + dx, p.y + dy);
+										int neighbourValue = board[neighbour.x][neighbour.y];
+										
+										if (neighbourValue == E) {
+											// If empty and unvisited, search around that empty spot as well
+											if (!visited[neighbour.x][neighbour.y]) {
+												visited[neighbour.x][neighbour.y] = true;
+												checkArea.push(neighbour);
+											}
+										}
+										else if (surroundingNeighbour == 0) {
+											// If first non-empty neighbour, make this the surrounding neighbour to compare to
+											surroundingNeighbour = neighbourValue;
+										}
+										else if (surroundingNeighbour != neighbourValue) {
+											// If this neighbour is not the same, this is a neutral area and we should stahp
+											isNeutralArea = true;
+										}
+									}
+								}
+							}
+						}
+					}
+
+					if (!isNeutralArea) {
+						// The empty area belongs to the surroundingNeighbour
+						if (surroundingNeighbour == P) {
+							playerScore += emptyArea;
+						}
+						else if (surroundingNeighbour == C) {
+							computerScore += emptyArea;
+						}
+					}
+				}
+			}
+
+		}
+	}
+}
+
+int simulateToEnd(int(&board)[SIZE][SIZE]) {
+	int x = rand() % SIZE;
+	int y = rand() % SIZE;
+
+	int player = C;
+	for (int i = 0; i < initialDepth; i++) {
+		if (i % 2) {
+			player = C;
+		}
+		else {
+			player = P;
+		}
+		int validity = makeMove(board, Point(x, y), player);
+	}
+	int playerScore = 0;
+	int computerScore = 0;
+	score(playerScore, computerScore, board);
+
+	return 0;
+}
+
+int __stdcall makeComputerMove(int& x, int& y, int& playerScore, int& computerScore, int *vbaBoard) {
+	// Convert VBA 2D array to manageable one
+	int board[SIZE][SIZE] = { 0 };
+	for (int i = 0; i < SIZE; i++) {
+		for (int j = 0; j < SIZE; j++) {
+			board[i][j] = valueAt(i, j, vbaBoard);
+		}
+	}
+	score(playerScore, computerScore, board);
+	//int win = simulateToEnd(board);
+	return 0;
 }

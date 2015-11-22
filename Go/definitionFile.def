@@ -1,3 +1,4 @@
 LIBRARY "go"
 EXPORTS
 	makePlayerMove
+	makeComputerMove
