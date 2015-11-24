@@ -3,8 +3,8 @@
 // Board constants
 const int SIZE = 9;	// Size of board
 const int E = 0;	//Empty board space
-const int P = 1;	// Player piece
-const int C = 2;	// Computer piece
+const int B = 1;	// Black piece
+const int W = 2;	// White piece
 
 // Move constants
 const int INVALID = -1;	// Move is invalid
@@ -27,6 +27,7 @@ public:
 	}
 };
 
+// Not used yet
 class Component {
 public:
 	int size;
@@ -101,7 +102,9 @@ bool isCapture(int(&board)[SIZE][SIZE], bool(&visited)[SIZE][SIZE], Point move, 
 	return true;
 }
 
-// Perform a move on the Go Board, checking for validity and capture
+/* 
+	Perform a move on the Go Board, checking for validity and capture
+*/
 int makeMove(int(&board)[SIZE][SIZE], Point move, int player) {
 	// Make sure move location isn't currently occupied
 	if (board[move.x][move.y] != E) {
@@ -119,8 +122,8 @@ int makeMove(int(&board)[SIZE][SIZE], Point move, int player) {
 	// Make the move and update capture pieces if necessary
 	else {
 		int opponent;
-		if (player == P) { opponent = C; }
-		else { opponent = P; }
+		if (player == W) { opponent = B; }
+		else { opponent = W; }
 
 		reinitializeCheckBoard(visited);
 
@@ -147,44 +150,24 @@ int makeMove(int(&board)[SIZE][SIZE], Point move, int player) {
 	return VALID;
 }
 
+/*
+	Scores board based on number of stones on the board and captured area.
+*/
+void score(int& blackScore, int& whiteScore, int(&board)[SIZE][SIZE]) {
+	blackScore = 0;
+	whiteScore = 0;
 
-int __stdcall makePlayerMove(int& x, int& y, int& playerScore, int& cpuScore, int *vbaBoard) {
-	// Convert VBA 2D array to manageable one
-	int board[SIZE][SIZE] = { 0 };
-	for (int i = 0; i < SIZE; i++) {
-		for (int j = 0; j < SIZE; j++) {
-			board[i][j] = valueAt(i, j, vbaBoard);
-		}
-	}
-
-	int validity = makeMove(board, Point(x, y), P);
-	// Return without changing board if move is invalid
-	if (validity == INVALID) {
-		return INVALID;
-	}
-
-	// Update board if necessary and return
-	for (int i = 0; i < SIZE; i++) {
-		for (int j = 0; j < SIZE; j++) {
-			writeAt(i, j, vbaBoard, board[i][j]);
-		}
-	}
-
-	return VALID;
-}
-
-void score(int& playerScore, int& computerScore, int(&board)[SIZE][SIZE]) {
 	bool visited[SIZE][SIZE] = { false };
 
 	for (int i = 0; i < SIZE; i++) {
 		for (int j = 0; j < SIZE; j++) {
 			if (visited[i][j] == false) {
 				visited[i][j] = true;
-				if (board[i][j] == P) {
-					playerScore++;
+				if (board[i][j] == B) {
+					blackScore++;
 				}
-				else if (board[i][j] == C) {
-					computerScore++;
+				else if (board[i][j] == W) {
+					whiteScore++;
 				}
 				else {
 					// If empty point, look around to see what it's surrounded by
@@ -207,7 +190,7 @@ void score(int& playerScore, int& computerScore, int(&board)[SIZE][SIZE]) {
 									if (p.x + dx < SIZE && p.x + dx >= 0 && p.y + dy < SIZE && p.y + dy >= 0) {
 										Point neighbour = Point(p.x + dx, p.y + dy);
 										int neighbourValue = board[neighbour.x][neighbour.y];
-										
+
 										if (neighbourValue == E) {
 											// If empty and unvisited, search around that empty spot as well
 											if (!visited[neighbour.x][neighbour.y]) {
@@ -231,11 +214,11 @@ void score(int& playerScore, int& computerScore, int(&board)[SIZE][SIZE]) {
 
 					if (!isNeutralArea) {
 						// The empty area belongs to the surroundingNeighbour
-						if (surroundingNeighbour == P) {
-							playerScore += emptyArea;
+						if (surroundingNeighbour == B) {
+							blackScore += emptyArea;
 						}
-						else if (surroundingNeighbour == C) {
-							computerScore += emptyArea;
+						else if (surroundingNeighbour == W) {
+							whiteScore += emptyArea;
 						}
 					}
 				}
@@ -245,28 +228,11 @@ void score(int& playerScore, int& computerScore, int(&board)[SIZE][SIZE]) {
 	}
 }
 
-int simulateToEnd(int(&board)[SIZE][SIZE]) {
-	int x = rand() % SIZE;
-	int y = rand() % SIZE;
-
-	int player = C;
-	for (int i = 0; i < initialDepth; i++) {
-		if (i % 2) {
-			player = C;
-		}
-		else {
-			player = P;
-		}
-		int validity = makeMove(board, Point(x, y), player);
-	}
-	int playerScore = 0;
-	int computerScore = 0;
-	score(playerScore, computerScore, board);
-
-	return 0;
-}
-
-int __stdcall makeComputerMove(int& x, int& y, int& playerScore, int& computerScore, int *vbaBoard) {
+/*
+	Makes a move on the board in the specified colour.
+	Modifies the board and scores for each colour.
+*/
+int __stdcall makePlayerMove(int& x, int& y, int& blackScore, int& whiteScore, int& colour, int *vbaBoard) {
 	// Convert VBA 2D array to manageable one
 	int board[SIZE][SIZE] = { 0 };
 	for (int i = 0; i < SIZE; i++) {
@@ -274,7 +240,65 @@ int __stdcall makeComputerMove(int& x, int& y, int& playerScore, int& computerSc
 			board[i][j] = valueAt(i, j, vbaBoard);
 		}
 	}
-	score(playerScore, computerScore, board);
-	//int win = simulateToEnd(board);
+
+	int validity = makeMove(board, Point(x, y), B);
+	// Return without changing board if move is invalid
+	if (validity == INVALID) {
+		return INVALID;
+	}
+
+	// Update board if necessary and return
+	for (int i = 0; i < SIZE; i++) {
+		for (int j = 0; j < SIZE; j++) {
+			writeAt(i, j, vbaBoard, board[i][j]);
+		}
+	}
+	score(blackScore, whiteScore, board);
+
+	return VALID;
+}
+
+/*
+	This ain't done at all
+*/
+int simulateToEnd(int(&board)[SIZE][SIZE]) {
+	// We should have a list of available moves to rand choose from instead of generating a random move and checking if it's valid at some point
+	int x = rand() % SIZE;
+	int y = rand() % SIZE;
+
+	int player = W;
+	for (int i = 0; i < initialDepth; i++) {
+		if (i % 2) {
+			player = W;
+		}
+		else {
+			player = B;
+		}
+		int validity = makeMove(board, Point(x, y), player);
+	}
+	int blackScore = 0;
+	int whiteScore = 0;
+	score(blackScore, whiteScore, board);
+
+	return 0;
+}
+
+/*
+	Determine computer's next best move. Will take a while to run.
+*/
+int __stdcall determineComputerMove(int& x, int& y, int& blackScore, int& whiteScore, int& colour, int& difficulty, int *vbaBoard) {
+	// Convert VBA 2D array to manageable one
+	int board[SIZE][SIZE] = { 0 };
+	for (int i = 0; i < SIZE; i++) {
+		for (int j = 0; j < SIZE; j++) {
+			board[i][j] = valueAt(i, j, vbaBoard);
+		}
+	}
+	// Bad hardcoded things for demo
+	x = 8;
+	y = 8;
+	board[x][y] = colour;
+
+	score(blackScore, whiteScore, board);
 	return 0;
 }
