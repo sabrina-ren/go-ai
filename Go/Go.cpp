@@ -109,85 +109,147 @@ void writeAt(int col, int row, int *board, int value) {
 /*
 Returns true if valid, false if invalid
 */
-bool isCapture(int(&board)[SIZE][SIZE], bool(&visited)[SIZE][SIZE], Point move, int player) {
+bool isCapture(int(&board)[SIZE][SIZE], bool(&checkBoard)[SIZE][SIZE], Point move, int player) {
 	std::queue <Point> checkArea;
-	//Point* test;
+	Point* test;
 
-	visited[move.x][move.y] = true;
+	checkBoard[move.x][move.y] = true;
 	checkArea.push(move);
 
 	while (!checkArea.empty()) {
-		Point p = checkArea.front();
+		Point next = checkArea.front();
 		checkArea.pop();
 
-		// Check four neighbours around the point to check
-		for (int dx = -1; dx <= 1; dx++) {
-			for (int dy = -1; dy <= 1; dy++) {
-				if (!(dx == 0) != !(dy == 0)) {
-					if (p.x + dx < SIZE && p.x + dx >= 0 && p.y + dy < SIZE && p.y + dy >= 0) {
-						Point neighbour = Point(p.x + dx, p.y + dy);
-
-						// An empty space means that pieces have not been captured
-						if (board[neighbour.x][neighbour.y] == E) {
-							return false;
-						}
-						if (visited[neighbour.x][neighbour.y] == false && board[p.x][p.y] == player) {
-							visited[neighbour.x][neighbour.y] = true;
-							checkArea.push(p);
-						}
-					}
-				}
+		//check pos above
+		if (next.x != 0) {
+			test = new Point(next.x - 1, next.y);
+			//an empty space means the pieces haven't been captured
+			if (board[test->x][test->y] == E) {
+				delete test;
+				return false;
 			}
+
+			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
+				checkBoard[test->x][test->y] = true;
+				checkArea.push(*test);
+			}
+			delete test;
+		}
+		//check pos below
+		if (next.x != 8) {
+			test = new Point(next.x + 1, next.y);
+			//an empty space means the pieces haven't been captured
+			if (board[test->x][test->y] == E) {
+				delete test;
+				return false;
+			}
+
+			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
+				checkBoard[test->x][test->y] = true;
+				checkArea.push(*test);
+			}
+			delete test;
+		}
+		//check pos left
+		if (next.y != 0) {
+			test = new Point(next.x, next.y - 1);
+			//an empty space means the pieces haven't been captured
+			if (board[test->x][test->y] == E) {
+				delete test;
+				return false;
+			}
+
+			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
+				checkBoard[test->x][test->y] = true;
+				checkArea.push(*test);
+			}
+			delete test;
+		}
+		//check pos right
+		if (next.y != 8) {
+			test = new Point(next.x, next.y + 1);
+			//an empty space means the pieces haven't been captured
+			if (board[test->x][test->y] == E) {
+				delete test;
+				return false;
+			}
+
+			if (checkBoard[test->x][test->y] == false && board[test->x][test->y] == player) {
+				checkBoard[test->x][test->y] = true;
+				checkArea.push(*test);
+			}
+			delete test;
 		}
 	}
 
 	return true;
 }
 
-/*
-Perform a move on the Go Board, checking for validity and capture
-*/
+//Perform a move on the GO Board, checking for validity and capture
 int makeMove(int(&board)[SIZE][SIZE], Point move, int player) {
-	// Make sure move location isn't currently occupied
+	//make sure move location isn't currently occupied
+	bool checkBoard[SIZE][SIZE] = { false };
 	if (board[move.x][move.y] != E) {
 		return INVALID;
 	}
 
-	// Make sure that move is not a suicide
-	bool visited[SIZE][SIZE] = { false };
+	//make sure that move is not a suicide
 	board[move.x][move.y] = player;
-	if (isCapture(board, visited, move, player)) {
+	if (isCapture(board, checkBoard, move, player)) {
 		board[move.x][move.y] = E;
 		return INVALID;
 	}
-
-	// Make the move and update capture pieces if necessary
+	//make the move and update capture pieces if necessary
 	else {
-		int opponent;
-		if (player == W) { opponent = B; }
-		else { opponent = W; }
+		int opponent = getOpponent(player);
 
-		reinitializeCheckBoard(visited);
+		reinitializeCheckBoard(checkBoard);
 
-		// Check for an adjacent opponent piece and see if it was part of a capture
+		//check for an adjacent opponent piece and see if it was part of a capture
 		bool result = false;
-
-		for (int dx = -1; dx <= 1; dx++) {
-			for (int dy = -1; dy <= 1; dy++) {
-				if (!(dx == 0) != !(dy == 0)) {
-					if (move.x + dx < SIZE && move.x + dx >= 0 && move.y + dy < SIZE && move.y + dy >= 0) {
-						if (board[move.x + dx][move.y + dy] == opponent) {
-							result = isCapture(board, visited, Point(move.x + dx, move.y + dy), opponent);
-							if (result) {
-								removePieces(board, visited);
-								reinitializeCheckBoard(visited);
-								result = false;
-							}
-						}
-					}
+		//check pos above
+		if (move.x != 0) {
+			if (board[move.x - 1][move.y] == opponent) {
+				result = isCapture(board, checkBoard, Point(move.x - 1, move.y), opponent);
+				if (result) {
+					removePieces(board, checkBoard);
+					reinitializeCheckBoard(checkBoard);
+					result = false;
 				}
 			}
 		}
+		//check pos below
+		if (move.x != 8) {
+			if (board[move.x + 1][move.y] == opponent) {
+				result = isCapture(board, checkBoard, Point(move.x + 1, move.y), opponent);
+				if (result) {
+					removePieces(board, checkBoard);
+					reinitializeCheckBoard(checkBoard);
+					result = false;
+				}
+			}
+		}
+		//check pos left
+		if (move.y != 0) {
+			if (board[move.x][move.y - 1] == opponent) {
+				result = isCapture(board, checkBoard, Point(move.x, move.y - 1), opponent);
+				if (result) {
+					removePieces(board, checkBoard);
+					reinitializeCheckBoard(checkBoard);
+					result = false;
+				}
+			}
+		}
+		//check pos right
+		if (move.y != 8) {
+			if (board[move.x][move.y + 1] == opponent) {
+				result = isCapture(board, checkBoard, Point(move.x, move.y + 1), opponent);
+				if (result) {
+					removePieces(board, checkBoard);
+				}
+			}
+		}
+
 	}
 	return VALID;
 }
@@ -424,7 +486,10 @@ int simulateAll(int(&board)[SIZE][SIZE], int& colour) {
 		return PASS;
 	}
 	else {
-		board[winner.x][winner.y] = colour;
+		while (winner.parent != NULL) {
+			winner = *winner.parent;
+		}
+		makeMove(board, Point(winner.x, winner.y), winner.moveColour);
 		return MOVE;
 	}
 
